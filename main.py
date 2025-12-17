@@ -56,12 +56,10 @@ if "messages" not in st.session_state:
         return_messages=True
     )
 
-    # モード「日常英会話」用のChain作成
-    st.session_state.chain_basic_conversation = ft.create_chain(ct.SYSTEM_TEMPLATE_BASIC_CONVERSATION)
+    # 英語レベル別のChainは動的に作成（初期化時には作成しない）
+    st.session_state.chain_basic_conversation = None
 
 # 初期表示
-# col1, col2, col3, col4 = st.columns([1, 1, 1, 2])
-# 提出課題用
 col1, col2, col3, col4 = st.columns([2, 2, 3, 3])
 with col1:
     if st.session_state.start_flg:
@@ -93,6 +91,73 @@ with col3:
     st.session_state.pre_mode = st.session_state.mode
 with col4:
     st.session_state.englv = st.selectbox(label="英語レベル", options=ct.ENGLISH_LEVEL_OPTION, label_visibility="collapsed")
+
+# トピックとシチュエーションの選択（シャドーイング・ディクテーションモードの場合のみ表示）
+if st.session_state.mode in [ct.MODE_2, ct.MODE_3]:
+    col5, col6 = st.columns(2)
+    with col5:
+        st.session_state.topic = st.selectbox(
+            label="トピック",
+            options=list(ct.TOPIC_OPTIONS.keys()),
+            label_visibility="collapsed",
+            key="topic_select"
+        )
+    with col6:
+        st.session_state.situation = st.selectbox(
+            label="シチュエーション",
+            options=list(ct.SITUATION_OPTIONS.keys()),
+            label_visibility="collapsed",
+            key="situation_select"
+        )
+
+# サイドバーに学習統計を表示
+with st.sidebar:
+    st.markdown("## 📊 学習統計")
+    
+    if 'score_history' in st.session_state and len(st.session_state.score_history) > 0:
+        scores = [item['score'] for item in st.session_state.score_history]
+        
+        # 統計情報
+        st.metric("総学習回数", len(scores))
+        st.metric("平均スコア", f"{sum(scores) / len(scores):.1f}点")
+        st.metric("最高スコア", f"{max(scores)}点")
+        st.metric("最新スコア", f"{scores[-1]}点")
+        
+        # スコアの推移グラフ
+        st.markdown("### スコア推移")
+        import pandas as pd
+        df_scores = pd.DataFrame({
+            '回数': range(1, len(scores) + 1),
+            'スコア': scores
+        })
+        st.line_chart(df_scores.set_index('回数'))
+        
+        # モード別の統計
+        st.markdown("### モード別統計")
+        mode_stats = {}
+        for item in st.session_state.score_history:
+            mode = item['mode']
+            if mode not in mode_stats:
+                mode_stats[mode] = []
+            mode_stats[mode].append(item['score'])
+        
+        for mode, mode_scores in mode_stats.items():
+            st.markdown(f"**{mode}**: 平均 {sum(mode_scores) / len(mode_scores):.1f}点 ({len(mode_scores)}回)")
+        
+        # リセットボタン
+        if st.button("📝 学習履歴をリセット"):
+            st.session_state.score_history = []
+            st.rerun()
+    else:
+        st.info("まだ学習記録がありません。\n練習を始めましょう！")
+    
+    st.divider()
+    st.markdown("## ℹ️ 操作説明")
+    st.markdown("""
+    - モードと英語レベルを選択
+    - 「開始」ボタンで練習開始
+    - 音声入力後、5秒間沈黙で確定
+    """)
 
 with st.chat_message("assistant", avatar="images/ai_icon.jpg"):
     st.markdown("こちらは生成AIによる音声英会話の練習アプリです。何度も繰り返し練習し、英語力をアップさせましょう。")
@@ -138,7 +203,12 @@ if st.session_state.start_flg:
     # 「ディクテーション」ボタン押下時か、「英会話開始」ボタン押下時か、チャット送信時
     if st.session_state.mode == ct.MODE_3 and (st.session_state.dictation_button_flg or st.session_state.dictation_count == 0 or st.session_state.dictation_chat_message):
         if st.session_state.dictation_first_flg:
-            st.session_state.chain_create_problem = ft.create_chain(ct.SYSTEM_TEMPLATE_CREATE_PROBLEM)
+            # 英語レベルに応じた問題文生成Chainを作成（トピック・シチュエーション考慮）
+            base_prompt = ct.SYSTEM_TEMPLATE_CREATE_PROBLEM[st.session_state.englv]
+            topic = st.session_state.get('topic', 'ランダム')
+            situation = st.session_state.get('situation', '指定なし')
+            modified_prompt = ft.create_problem_prompt_with_context(base_prompt, topic, situation)
+            st.session_state.chain_create_problem = ft.create_chain(modified_prompt)
             st.session_state.dictation_first_flg = False
         # チャット入力以外
         if not st.session_state.chat_open_flg:
@@ -173,6 +243,19 @@ if st.session_state.start_flg:
                 # 問題文と回答を比較し、評価結果の生成を指示するプロンプトを作成
                 llm_response_evaluation = ft.create_evaluation()
             
+            # スコアを抽出してバッジ表示
+            score = ft.extract_score(llm_response_evaluation)
+            if score is not None:
+                ft.display_score_badge(score)
+                # スコアを履歴に記録
+                if 'score_history' not in st.session_state:
+                    st.session_state.score_history = []
+                st.session_state.score_history.append({
+                    'mode': ct.MODE_3,
+                    'score': score,
+                    'timestamp': time.time()
+                })
+            
             # 評価結果のメッセージリストへの追加と表示
             with st.chat_message("assistant", avatar=ct.AI_ICON_PATH):
                 st.markdown(llm_response_evaluation)
@@ -190,6 +273,11 @@ if st.session_state.start_flg:
     
     # モード：「日常英会話」
     if st.session_state.mode == ct.MODE_1:
+        # 英語レベルに応じたChainを動的に作成（レベルが変更された場合に対応）
+        if st.session_state.chain_basic_conversation is None or not hasattr(st.session_state, 'current_level') or st.session_state.current_level != st.session_state.englv:
+            st.session_state.chain_basic_conversation = ft.create_chain(ct.SYSTEM_TEMPLATE_BASIC_CONVERSATION[st.session_state.englv])
+            st.session_state.current_level = st.session_state.englv
+        
         # 音声入力を受け取って音声ファイルを作成
         audio_input_file_path = f"{ct.AUDIO_INPUT_DIR}/audio_input_{int(time.time())}.wav"
         ft.record_audio(audio_input_file_path)
@@ -204,19 +292,23 @@ if st.session_state.start_flg:
             st.markdown(audio_input_text)
 
         with st.spinner("回答の音声読み上げ準備中..."):
-            # ユーザー入力値をLLMに渡して回答取得
-            llm_response = st.session_state.chain_basic_conversation.predict(input=audio_input_text)
-            
-            # LLMからの回答を音声データに変換
-            llm_response_audio = st.session_state.openai_obj.audio.speech.create(
-                model="tts-1",
-                voice="alloy",
-                input=llm_response
-            )
+            try:
+                # ユーザー入力値をLLMに渡して回答取得
+                llm_response = st.session_state.chain_basic_conversation.predict(input=audio_input_text)
+                
+                # LLMからの回答を音声データに変換
+                llm_response_audio = st.session_state.openai_obj.audio.speech.create(
+                    model="tts-1",
+                    voice="alloy",
+                    input=llm_response
+                )
 
-            # 一旦mp3形式で音声ファイル作成後、wav形式に変換
-            audio_output_file_path = f"{ct.AUDIO_OUTPUT_DIR}/audio_output_{int(time.time())}.wav"
-            ft.save_to_wav(llm_response_audio.content, audio_output_file_path)
+                # 一旦mp3形式で音声ファイル作成後、wav形式に変換
+                audio_output_file_path = f"{ct.AUDIO_OUTPUT_DIR}/audio_output_{int(time.time())}.wav"
+                ft.save_to_wav(llm_response_audio.content, audio_output_file_path)
+            except Exception as e:
+                st.error(f"⚠️ 回答生成中にエラーが発生しました: {str(e)}")
+                st.stop()
 
         # 音声ファイルの読み上げ
         ft.play_wav(audio_output_file_path, speed=st.session_state.speed)
@@ -234,7 +326,12 @@ if st.session_state.start_flg:
     # 「シャドーイング」ボタン押下時か、「英会話開始」ボタン押下時
     if st.session_state.mode == ct.MODE_2 and (st.session_state.shadowing_button_flg or st.session_state.shadowing_count == 0 or st.session_state.shadowing_audio_input_flg):
         if st.session_state.shadowing_first_flg:
-            st.session_state.chain_create_problem = ft.create_chain(ct.SYSTEM_TEMPLATE_CREATE_PROBLEM)
+            # 英語レベルに応じた問題文生成Chainを作成（トピック・シチュエーション考慮）
+            base_prompt = ct.SYSTEM_TEMPLATE_CREATE_PROBLEM[st.session_state.englv]
+            topic = st.session_state.get('topic', 'ランダム')
+            situation = st.session_state.get('situation', '指定なし')
+            modified_prompt = ft.create_problem_prompt_with_context(base_prompt, topic, situation)
+            st.session_state.chain_create_problem = ft.create_chain(modified_prompt)
             st.session_state.shadowing_first_flg = False
         
         if not st.session_state.shadowing_audio_input_flg:
@@ -272,6 +369,19 @@ if st.session_state.start_flg:
                 st.session_state.shadowing_evaluation_first_flg = False
             # 問題文と回答を比較し、評価結果の生成を指示するプロンプトを作成
             llm_response_evaluation = ft.create_evaluation()
+        
+        # スコアを抽出してバッジ表示
+        score = ft.extract_score(llm_response_evaluation)
+        if score is not None:
+            ft.display_score_badge(score)
+            # スコアを履歴に記録
+            if 'score_history' not in st.session_state:
+                st.session_state.score_history = []
+            st.session_state.score_history.append({
+                'mode': ct.MODE_2,
+                'score': score,
+                'timestamp': time.time()
+            })
         
         # 評価結果のメッセージリストへの追加と表示
         with st.chat_message("assistant", avatar=ct.AI_ICON_PATH):
