@@ -196,8 +196,8 @@ if st.session_state.audio_file_to_play:
     st.session_state.audio_file_to_play = None  # フラグをクリア
     ft.play_wav(audio_file_path, st.session_state.speed)
 
-# メッセージリストの一覧表示
-for message in st.session_state.messages:
+# メッセージリストの一覧表示（最新が上）
+for message in reversed(st.session_state.messages):
     if message["role"] == "assistant":
         with st.chat_message(message["role"], avatar="images/ai_icon.jpg"):
             st.markdown(message["content"])
