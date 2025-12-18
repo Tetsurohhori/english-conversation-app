@@ -26,7 +26,8 @@ def record_audio(audio_input_file_path):
     if 'audio_recording_counter' not in st.session_state:
         st.session_state.audio_recording_counter = 0
     
-    st.info("🎤 マイクボタンをクリックして録音を開始し、もう一度クリックして停止してください")
+    st.info("🎤 マイクボタンをクリックして録音を開始し、話し終わったらもう一度クリックして停止してください")
+    st.warning("⚠️ 最低でも1秒以上話してください（短すぎるとエラーになります）")
     
     # 録音カウンターをkeyに使用（録音完了後にインクリメント）
     audio_bytes = audio_recorder(
@@ -39,10 +40,38 @@ def record_audio(audio_input_file_path):
     )
 
     if audio_bytes:
+        # 音声データの長さをチェック
+        audio_length = len(audio_bytes)
+        
+        # 音声が短すぎる場合（バイト数で判定、約0.1秒未満）
+        if audio_length < 1600:  # 16kHz × 0.1秒 = 1600バイト程度
+            st.error("❌ 録音が短すぎます。もう一度録音してください（最低1秒以上話してください）")
+            # カウンターをインクリメントしてリセット
+            st.session_state.audio_recording_counter += 1
+            st.stop()
+            return False
+        
         # 音声データをファイルに保存
         with open(audio_input_file_path, 'wb') as audio_file:
             audio_file.write(audio_bytes)
-        st.success("✅ 録音完了！音声を処理中...")
+        
+        # 音声ファイルの長さを確認（pydubを使用）
+        try:
+            from pydub import AudioSegment
+            audio = AudioSegment.from_file(audio_input_file_path)
+            duration_seconds = len(audio) / 1000.0  # ミリ秒を秒に変換
+            
+            if duration_seconds < 0.1:
+                st.error("❌ 録音が短すぎます（0.1秒未満）。もう一度録音してください")
+                os.remove(audio_input_file_path)  # 短すぎるファイルを削除
+                st.session_state.audio_recording_counter += 1
+                st.stop()
+                return False
+            
+            st.success(f"✅ 録音完了！（{duration_seconds:.1f}秒）音声を処理中...")
+        except Exception as e:
+            st.warning(f"⚠️ 音声の長さを確認できませんでしたが、処理を続行します")
+        
         # 次回のために録音カウンターをインクリメント
         st.session_state.audio_recording_counter += 1
         return True
