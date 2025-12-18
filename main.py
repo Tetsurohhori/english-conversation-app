@@ -60,8 +60,8 @@ if "messages" not in st.session_state:
     # 英語レベル別のChainは動的に作成（初期化時には作成しない）
     st.session_state.chain_basic_conversation = None
 
-# 最上部の設定エリア（再生速度・モード・英語レベル・テーマ）
-col1, col2, col3, col4 = st.columns([1, 1, 1, 1])
+# 最上部の設定エリア（再生速度・モード・英語レベル）
+col1, col2, col3 = st.columns([1, 1, 1])
 with col1:
     st.session_state.speed = st.selectbox(label="再生速度", options=ct.PLAY_SPEED_OPTION, index=3)
 with col2:
@@ -87,11 +87,16 @@ with col2:
     st.session_state.pre_mode = st.session_state.mode
 with col3:
     st.session_state.englv = st.selectbox(label="英語レベル", options=ct.ENGLISH_LEVEL_OPTION)
-with col4:
+
+# テーマ選択（シャドーイング・ディクテーションモードの場合のみ表示）
+if st.session_state.mode in [ct.MODE_2, ct.MODE_3]:
     st.session_state.topic = st.selectbox(
         label="テーマ",
         options=list(ct.TOPIC_OPTIONS.keys())
     )
+else:
+    # 日常英会話モードの場合はデフォルト値を設定
+    st.session_state.topic = "ランダム"
 
 # 場面（situation）はデフォルト値を設定（常に「指定なし」）
 st.session_state.situation = "指定なし"
@@ -140,18 +145,18 @@ with st.sidebar:
     st.divider()
     st.markdown("## ℹ️ 操作説明")
     st.markdown("""
-    - 設定を選択（速度・モード・レベル・テーマ）
+    - 設定を選択（速度・モード・レベル）
+    - シャドーイング/ディクテーションではテーマも選択
     - 下部の「開始」ボタンで練習開始
     - 録音ボタンをクリックして話す
-    - 録音完了後、自動的に次に進む
     """)
 
 with st.chat_message("assistant", avatar="images/ai_icon.jpg"):
     st.markdown("こちらは生成AIによる音声英会話の練習アプリです。何度も繰り返し練習し、英語力をアップさせましょう。")
     st.markdown("**【操作説明】**")
     st.success("""
-    - 上部で設定を選択してください（再生速度・モード・英語レベル・テーマ）
-    - モードは「日常英会話」「シャドーイング」「ディクテーション」から選べます
+    - 上部で設定を選択してください（再生速度・モード・英語レベル）
+    - シャドーイング・ディクテーションモードではテーマも選択できます
     - 設定完了後、下部の「開始」ボタンを押して練習を始めましょう
     - 音声入力：録音ボタンをクリックして話し、停止ボタンで確定します
     """)
