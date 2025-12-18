@@ -32,6 +32,7 @@ st.markdown(f"## {ct.APP_NAME}")
 if "messages" not in st.session_state:
     st.session_state.messages = []
     st.session_state.start_flg = False
+    st.session_state.pause_flg = False  # 一時中断フラグ
     st.session_state.pre_mode = ""
     st.session_state.shadowing_flg = False
     st.session_state.shadowing_button_flg = False
@@ -60,12 +61,26 @@ if "messages" not in st.session_state:
     st.session_state.chain_basic_conversation = None
 
 # 初期表示
-col1, col2, col3, col4 = st.columns([2, 2, 3, 3])
+col1, col1_5, col2, col3, col4 = st.columns([1.5, 1.5, 2, 3, 3])
 with col1:
     if st.session_state.start_flg:
-        st.button("開始", use_container_width=True, type="primary")
+        # 開始状態では「開始」ボタンを無効化
+        st.button("開始", use_container_width=True, type="primary", disabled=True)
     else:
         st.session_state.start_flg = st.button("開始", use_container_width=True, type="primary")
+with col1_5:
+    # 一時中断ボタン（開始状態の時のみ有効）
+    if st.session_state.start_flg:
+        if st.button("一時中断", use_container_width=True, type="secondary"):
+            # 中断処理: 状態をリセット
+            st.session_state.start_flg = False
+            st.session_state.shadowing_flg = False
+            st.session_state.dictation_flg = False
+            st.session_state.chat_open_flg = False
+            st.info("✋ 一時中断しました。「開始」ボタンで再開できます。")
+            st.rerun()
+    else:
+        st.button("一時中断", use_container_width=True, type="secondary", disabled=True)
 with col2:
     st.session_state.speed = st.selectbox(label="再生速度", options=ct.PLAY_SPEED_OPTION, index=3, label_visibility="collapsed")
 with col3:
@@ -156,17 +171,18 @@ with st.sidebar:
     st.markdown("""
     - モードと英語レベルを選択
     - 「開始」ボタンで練習開始
-    - 音声入力後、5秒間沈黙で確定
+    - 「発話開始」→話す→「発話終了」で音声入力
+    - 「一時中断」でいつでも中断可能
     """)
 
 with st.chat_message("assistant", avatar="images/ai_icon.jpg"):
     st.markdown("こちらは生成AIによる音声英会話の練習アプリです。何度も繰り返し練習し、英語力をアップさせましょう。")
     st.markdown("**【操作説明】**")
     st.success("""
-    - モードと再生速度を選択し、「英会話開始」ボタンを押して英会話を始めましょう。
+    - モードと英語レベルを選択し、「開始」ボタンを押して練習を始めましょう。
     - モードは「日常英会話」「シャドーイング」「ディクテーション」から選べます。
-    - 発話後、5秒間沈黙することで音声入力が完了します。
-    - 「一時中断」ボタンを押すことで、英会話を一時中断できます。
+    - 音声入力：「発話開始」ボタンを押して話し、「発話終了」ボタンで確定します。
+    - 「一時中断」ボタンを押すことで、いつでも練習を中断できます。
     """)
 st.divider()
 
