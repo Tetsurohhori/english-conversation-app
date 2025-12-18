@@ -108,15 +108,28 @@ def play_wav(audio_output_file_path, speed=1.0):
             modified_audio = modified_audio.set_frame_rate(audio.frame_rate)
             modified_audio.export(audio_output_file_path, format="wav")
         
-        # Streamlitのaudio機能で再生（自動再生）
+        # 音声ファイルを読み込み
         with open(audio_output_file_path, 'rb') as audio_file:
             audio_bytes = audio_file.read()
-            st.audio(audio_bytes, format='audio/wav', autoplay=True)
+        
+        # Streamlitのaudio機能で再生
+        st.audio(audio_bytes, format='audio/wav')
+        
+        # HTML5オーディオタグを使用して自動再生を試みる
+        import base64
+        audio_base64 = base64.b64encode(audio_bytes).decode()
+        audio_html = f"""
+        <audio autoplay>
+            <source src="data:audio/wav;base64,{audio_base64}" type="audio/wav">
+        </audio>
+        """
+        st.markdown(audio_html, unsafe_allow_html=True)
         
     except Exception as e:
         st.error(f"⚠️ 音声再生中にエラーが発生しました: {str(e)}")
     finally:
-        # LLMからの回答の音声ファイルを削除
+        # 音声再生後に少し待ってからファイルを削除
+        time.sleep(0.5)
         if os.path.exists(audio_output_file_path):
             os.remove(audio_output_file_path)
 
