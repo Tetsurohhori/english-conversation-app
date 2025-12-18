@@ -21,10 +21,17 @@ def record_audio(audio_input_file_path):
     Streamlitの標準audio_inputウィジェットを使用
     """
     
-    st.info("🎤 下の録音ボタンをクリックして話してください")
+    # 録音カウンターを初期化（session_stateで管理）
+    if 'audio_input_counter' not in st.session_state:
+        st.session_state.audio_input_counter = 0
     
-    # Streamlitの標準音声入力ウィジェット
-    audio_bytes = st.audio_input("音声を録音", key=f"audio_input_{int(time.time())}")
+    st.info("🎤 下の録音ボタンをクリックして話してください（録音が完了すると自動的に次に進みます）")
+    
+    # keyをsession_stateで管理（固定値）
+    audio_bytes = st.audio_input(
+        "音声を録音", 
+        key=f"audio_input_{st.session_state.audio_input_counter}"
+    )
     
     if audio_bytes:
         # 音声データをファイルに保存
@@ -59,16 +66,20 @@ def record_audio(audio_input_file_path):
                 return False
             
             st.success(f"✅ 録音完了！（{duration_seconds:.1f}秒）音声を処理中...")
+            # 次回のために録音カウンターをインクリメント
+            st.session_state.audio_input_counter += 1
             return True
             
         except Exception as e:
             st.error(f"⚠️ 音声ファイルの処理中にエラーが発生しました: {str(e)}")
             if os.path.exists(audio_input_file_path):
                 os.remove(audio_input_file_path)
+            # カウンターをインクリメントしてリセット
+            st.session_state.audio_input_counter += 1
             st.stop()
             return False
     else:
-        # 録音が完了していない場合は処理を中断
+        # 録音が完了していない場合は処理を中断（録音中）
         st.stop()
         return False
 
