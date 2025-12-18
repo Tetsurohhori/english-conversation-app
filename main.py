@@ -348,6 +348,9 @@ if st.session_state.start_flg:
         # ユーザー入力値とLLMからの回答をメッセージ一覧に追加
         st.session_state.messages.append({"role": "user", "content": audio_input_text})
         st.session_state.messages.append({"role": "assistant", "content": llm_response})
+        
+        # 次の会話のために再描画（録音ウィジェットを再表示）
+        st.rerun()
 
 
     # モード：「シャドーイング」
