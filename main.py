@@ -48,6 +48,7 @@ if "messages" not in st.session_state:
     st.session_state.dictation_evaluation_first_flg = True
     st.session_state.chat_open_flg = False
     st.session_state.problem = ""
+    st.session_state.audio_file_to_play = None  # 再生待ちの音声ファイル
     
     st.session_state.openai_obj = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
     st.session_state.llm = ChatOpenAI(model_name="gpt-4o-mini", temperature=0.5)
@@ -189,6 +190,12 @@ with col_btn2:
 
 st.divider()
 
+# 再生待ちの音声ファイルがあれば再生
+if st.session_state.audio_file_to_play:
+    audio_file_path = st.session_state.audio_file_to_play
+    st.session_state.audio_file_to_play = None  # フラグをクリア
+    ft.play_wav(audio_file_path, st.session_state.speed)
+
 # メッセージリストの一覧表示
 for message in st.session_state.messages:
     if message["role"] == "assistant":
@@ -232,8 +239,10 @@ if st.session_state.start_flg:
         # チャット入力以外
         if not st.session_state.chat_open_flg:
             with st.spinner('問題文生成中...'):
-                st.session_state.problem, llm_response_audio = ft.create_problem_and_play_audio()
-
+                st.session_state.problem, llm_response_audio, audio_file_path = ft.create_problem_and_play_audio()
+            
+            # 音声ファイルを再生待ちリストに追加
+            st.session_state.audio_file_to_play = audio_file_path
             st.session_state.chat_open_flg = True
             st.session_state.dictation_flg = False
             st.rerun()
@@ -355,7 +364,9 @@ if st.session_state.start_flg:
         
         if not st.session_state.shadowing_audio_input_flg:
             with st.spinner('問題文生成中...'):
-                st.session_state.problem, llm_response_audio = ft.create_problem_and_play_audio()
+                st.session_state.problem, llm_response_audio, audio_file_path = ft.create_problem_and_play_audio()
+            # シャドーイングは問題文生成後すぐに音声を再生
+            ft.play_wav(audio_file_path, st.session_state.speed)
 
         # 音声入力を受け取って音声ファイルを作成
         st.session_state.shadowing_audio_input_flg = True

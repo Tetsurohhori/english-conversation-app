@@ -97,6 +97,9 @@ def play_wav(audio_output_file_path, speed=1.0):
         # 音声ファイルの読み込み
         audio = AudioSegment.from_wav(audio_output_file_path)
         
+        # 音声の長さを取得（ミリ秒）
+        audio_duration = len(audio) / 1000.0  # 秒に変換
+        
         # 速度を変更
         if speed != 1.0:
             # frame_rateを変更することで速度を調整
@@ -107,6 +110,8 @@ def play_wav(audio_output_file_path, speed=1.0):
             # 元のframe_rateに戻すことで正常再生させる（ピッチを保持したまま速度だけ変更）
             modified_audio = modified_audio.set_frame_rate(audio.frame_rate)
             modified_audio.export(audio_output_file_path, format="wav")
+            # 速度変更後の音声を再読み込み
+            audio = AudioSegment.from_wav(audio_output_file_path)
         
         # 音声ファイルを読み込み
         with open(audio_output_file_path, 'rb') as audio_file:
@@ -125,11 +130,14 @@ def play_wav(audio_output_file_path, speed=1.0):
         """
         st.markdown(audio_html, unsafe_allow_html=True)
         
+        # 音声の長さ分だけ待つ（再生が完了するまで）
+        # +1秒の余裕を持たせる
+        time.sleep(audio_duration + 1.0)
+        
     except Exception as e:
         st.error(f"⚠️ 音声再生中にエラーが発生しました: {str(e)}")
     finally:
-        # 音声再生後に少し待ってからファイルを削除
-        time.sleep(0.5)
+        # 音声再生完了後にファイルを削除
         if os.path.exists(audio_output_file_path):
             os.remove(audio_output_file_path)
 
@@ -180,11 +188,13 @@ def create_problem_prompt_with_context(base_prompt, topic, situation):
 
 def create_problem_and_play_audio():
     """
-    問題生成と音声ファイルの再生
+    問題生成と音声ファイルの作成（再生は呼び出し側で行う）
     Args:
         chain: 問題文生成用のChain
         speed: 再生速度（1.0が通常速度、0.5で半分の速さ、2.0で倍速など）
         openai_obj: OpenAIのオブジェクト
+    Returns:
+        tuple: (problem, llm_response_audio, audio_output_file_path)
     """
     try:
         # 問題文を生成するChainを実行し、問題文を取得
@@ -201,10 +211,8 @@ def create_problem_and_play_audio():
         audio_output_file_path = f"{ct.AUDIO_OUTPUT_DIR}/audio_output_{int(time.time())}.wav"
         save_to_wav(llm_response_audio.content, audio_output_file_path)
 
-        # 音声ファイルの読み上げ
-        play_wav(audio_output_file_path, st.session_state.speed)
-
-        return problem, llm_response_audio
+        # 音声ファイルパスも返す（再生は呼び出し側で行う）
+        return problem, llm_response_audio, audio_output_file_path
         
     except RateLimitError:
         st.error("⚠️ API利用制限に達しました。しばらく待ってから再度お試しください。")
