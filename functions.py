@@ -23,7 +23,7 @@ from openai import OpenAIError, APIError, APIConnectionError, RateLimitError
 def record_audio(audio_input_file_path):
     """
     音声入力を受け取って音声ファイルを作成
-    15秒間沈黙すると自動的に録音が完了します
+    5秒間沈黙すると自動的に録音が完了します
     """
 
     audio = audiorecorder(
@@ -34,7 +34,7 @@ def record_audio(audio_input_file_path):
         pause_style={"color":"gray", "background-color":"white"},
         stop_style={"color":"white", "background-color":"black"},
         show_visualizer=True,
-        # 15秒間の沈黙で自動停止（audiorecorderのデフォルトは5秒）
+        # 5秒間の沈黙で自動停止
         key=f"audio_{audio_input_file_path}"
     )
 

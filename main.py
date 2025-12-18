@@ -60,31 +60,12 @@ if "messages" not in st.session_state:
     # 英語レベル別のChainは動的に作成（初期化時には作成しない）
     st.session_state.chain_basic_conversation = None
 
-# 初期表示
-col1, col1_5, col2, col3, col4 = st.columns([1.5, 1.5, 2, 3, 3])
+# 最上部の設定エリア（再生速度・モード・英語レベル）
+col1, col2, col3 = st.columns([1, 1, 1])
 with col1:
-    if st.session_state.start_flg:
-        # 開始状態では「開始」ボタンを無効化
-        st.button("開始", use_container_width=True, type="primary", disabled=True)
-    else:
-        st.session_state.start_flg = st.button("開始", use_container_width=True, type="primary")
-with col1_5:
-    # 一時中断ボタン（開始状態の時のみ有効）
-    if st.session_state.start_flg:
-        if st.button("一時中断", use_container_width=True, type="secondary"):
-            # 中断処理: 状態をリセット
-            st.session_state.start_flg = False
-            st.session_state.shadowing_flg = False
-            st.session_state.dictation_flg = False
-            st.session_state.chat_open_flg = False
-            st.info("✋ 一時中断しました。「開始」ボタンで再開できます。")
-            st.rerun()
-    else:
-        st.button("一時中断", use_container_width=True, type="secondary", disabled=True)
+    st.session_state.speed = st.selectbox(label="再生速度", options=ct.PLAY_SPEED_OPTION, index=3)
 with col2:
-    st.session_state.speed = st.selectbox(label="再生速度", options=ct.PLAY_SPEED_OPTION, index=3, label_visibility="collapsed")
-with col3:
-    st.session_state.mode = st.selectbox(label="モード", options=[ct.MODE_1, ct.MODE_2, ct.MODE_3], label_visibility="collapsed")
+    st.session_state.mode = st.selectbox(label="モード", options=[ct.MODE_1, ct.MODE_2, ct.MODE_3])
     # モードを変更した際の処理
     if st.session_state.mode != st.session_state.pre_mode:
         # 自動でそのモードの処理が実行されないようにする
@@ -104,8 +85,8 @@ with col3:
         # チャット入力欄を非表示にする
         st.session_state.chat_open_flg = False
     st.session_state.pre_mode = st.session_state.mode
-with col4:
-    st.session_state.englv = st.selectbox(label="英語レベル", options=ct.ENGLISH_LEVEL_OPTION, label_visibility="collapsed")
+with col3:
+    st.session_state.englv = st.selectbox(label="英語レベル", options=ct.ENGLISH_LEVEL_OPTION)
 
 # トピックとシチュエーションの選択（シャドーイング・ディクテーションモードの場合のみ表示）
 if st.session_state.mode in [ct.MODE_2, ct.MODE_3]:
@@ -171,7 +152,8 @@ with st.sidebar:
     st.markdown("""
     - モードと英語レベルを選択
     - 「開始」ボタンで練習開始
-    - 「発話開始」→話す→「発話終了」で音声入力
+    - 音声入力は「発話開始」→話す→「発話終了」
+    - 5秒沈黙で自動確定
     - 「一時中断」でいつでも中断可能
     """)
 
@@ -181,9 +163,32 @@ with st.chat_message("assistant", avatar="images/ai_icon.jpg"):
     st.success("""
     - モードと英語レベルを選択し、「開始」ボタンを押して練習を始めましょう。
     - モードは「日常英会話」「シャドーイング」「ディクテーション」から選べます。
-    - 音声入力：「発話開始」ボタンを押して話し、「発話終了」ボタンで確定します。
+    - 音声入力：「発話開始」ボタンを押して話し、「発話終了」ボタンで確定します（5秒沈黙で自動確定）。
     - 「一時中断」ボタンを押すことで、いつでも練習を中断できます。
     """)
+
+# 開始・一時中断ボタン（5:5配置）
+col_btn1, col_btn2 = st.columns([5, 5])
+with col_btn1:
+    if st.session_state.start_flg:
+        # 開始状態では「開始」ボタンを無効化
+        st.button("開始", use_container_width=True, type="primary", disabled=True)
+    else:
+        st.session_state.start_flg = st.button("開始", use_container_width=True, type="primary")
+with col_btn2:
+    # 一時中断ボタン（開始状態の時のみ有効）
+    if st.session_state.start_flg:
+        if st.button("一時中断", use_container_width=True, type="secondary"):
+            # 中断処理: 状態をリセット
+            st.session_state.start_flg = False
+            st.session_state.shadowing_flg = False
+            st.session_state.dictation_flg = False
+            st.session_state.chat_open_flg = False
+            st.info("✋ 一時中断しました。「開始」ボタンで再開できます。")
+            st.rerun()
+    else:
+        st.button("一時中断", use_container_width=True, type="secondary", disabled=True)
+
 st.divider()
 
 # メッセージリストの一覧表示
