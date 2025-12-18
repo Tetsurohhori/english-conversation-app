@@ -19,19 +19,37 @@ from openai import OpenAIError, APIError, APIConnectionError, RateLimitError
 def record_audio(audio_input_file_path):
     """
     音声入力を受け取って音声ファイルを作成
-    5秒間沈黙すると自動的に録音が完了します
+    ユーザーが録音ボタンを押して録音を開始・停止します
     """
-
+    
+    # 録音カウンターを初期化（session_stateで管理）
+    if 'audio_recording_counter' not in st.session_state:
+        st.session_state.audio_recording_counter = 0
+    
+    st.info("🎤 マイクボタンをクリックして録音を開始し、もう一度クリックして停止してください")
+    
+    # 録音カウンターをkeyに使用（録音完了後にインクリメント）
     audio_bytes = audio_recorder(
-        key=f"audio_{audio_input_file_path}"
+        text="",
+        recording_color="#e74c3c",
+        neutral_color="#3498db",
+        icon_name="microphone",
+        icon_size="3x",
+        key=f"audio_recorder_{st.session_state.audio_recording_counter}"
     )
 
     if audio_bytes:
         # 音声データをファイルに保存
         with open(audio_input_file_path, 'wb') as audio_file:
             audio_file.write(audio_bytes)
+        st.success("✅ 録音完了！音声を処理中...")
+        # 次回のために録音カウンターをインクリメント
+        st.session_state.audio_recording_counter += 1
+        return True
     else:
+        # 録音が完了していない場合は処理を中断
         st.stop()
+        return False
 
 def transcribe_audio(audio_input_file_path):
     """
