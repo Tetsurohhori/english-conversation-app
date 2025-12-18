@@ -32,7 +32,6 @@ st.markdown(f"## {ct.APP_NAME}")
 if "messages" not in st.session_state:
     st.session_state.messages = []
     st.session_state.start_flg = False
-    st.session_state.pause_flg = False  # 一時中断フラグ
     st.session_state.pre_mode = ""
     st.session_state.shadowing_flg = False
     st.session_state.shadowing_button_flg = False
@@ -61,8 +60,8 @@ if "messages" not in st.session_state:
     # 英語レベル別のChainは動的に作成（初期化時には作成しない）
     st.session_state.chain_basic_conversation = None
 
-# 最上部の設定エリア（再生速度・モード・英語レベル）
-col1, col2, col3 = st.columns([1, 1, 1])
+# 最上部の設定エリア（再生速度・モード・英語レベル・テーマ）
+col1, col2, col3, col4 = st.columns([1, 1, 1, 1])
 with col1:
     st.session_state.speed = st.selectbox(label="再生速度", options=ct.PLAY_SPEED_OPTION, index=3)
 with col2:
@@ -88,22 +87,14 @@ with col2:
     st.session_state.pre_mode = st.session_state.mode
 with col3:
     st.session_state.englv = st.selectbox(label="英語レベル", options=ct.ENGLISH_LEVEL_OPTION)
+with col4:
+    st.session_state.topic = st.selectbox(
+        label="テーマ",
+        options=list(ct.TOPIC_OPTIONS.keys())
+    )
 
-# トピックとシチュエーションの選択（シャドーイング・ディクテーションモードの場合のみ表示）
-if st.session_state.mode in [ct.MODE_2, ct.MODE_3]:
-    col5, col6 = st.columns(2)
-    with col5:
-        st.session_state.topic = st.selectbox(
-            label="テーマ",
-            options=list(ct.TOPIC_OPTIONS.keys()),
-            key="topic_select"
-        )
-    with col6:
-        st.session_state.situation = st.selectbox(
-            label="場面",
-            options=list(ct.SITUATION_OPTIONS.keys()),
-            key="situation_select"
-        )
+# 場面（situation）はデフォルト値を設定（常に「指定なし」）
+st.session_state.situation = "指定なし"
 
 # サイドバーに学習統計を表示
 with st.sidebar:
@@ -149,46 +140,21 @@ with st.sidebar:
     st.divider()
     st.markdown("## ℹ️ 操作説明")
     st.markdown("""
-    - モードと英語レベルを選択
-    - 「開始」ボタンで練習開始
-    - 音声入力は「発話開始」→話す→「発話終了」
-    - 5秒沈黙で自動確定
-    - 「一時中断」でいつでも中断可能
+    - 設定を選択（速度・モード・レベル・テーマ）
+    - 下部の「開始」ボタンで練習開始
+    - 録音ボタンをクリックして話す
+    - 録音完了後、自動的に次に進む
     """)
 
 with st.chat_message("assistant", avatar="images/ai_icon.jpg"):
     st.markdown("こちらは生成AIによる音声英会話の練習アプリです。何度も繰り返し練習し、英語力をアップさせましょう。")
     st.markdown("**【操作説明】**")
     st.success("""
-    - モードと英語レベルを選択し、「開始」ボタンを押して練習を始めましょう。
-    - モードは「日常英会話」「シャドーイング」「ディクテーション」から選べます。
-    - 音声入力：「発話開始」ボタンを押して話し、「発話終了」ボタンで確定します（5秒沈黙で自動確定）。
-    - 「一時中断」ボタンを押すことで、いつでも練習を中断できます。
+    - 上部で設定を選択してください（再生速度・モード・英語レベル・テーマ）
+    - モードは「日常英会話」「シャドーイング」「ディクテーション」から選べます
+    - 設定完了後、下部の「開始」ボタンを押して練習を始めましょう
+    - 音声入力：録音ボタンをクリックして話し、停止ボタンで確定します
     """)
-
-# 開始・一時中断ボタン（5:5配置）
-col_btn1, col_btn2 = st.columns([5, 5])
-with col_btn1:
-    if st.session_state.start_flg:
-        # 開始状態では「開始」ボタンを無効化
-        st.button("開始", use_container_width=True, type="primary", disabled=True)
-    else:
-        st.session_state.start_flg = st.button("開始", use_container_width=True, type="primary")
-with col_btn2:
-    # 一時中断ボタン（開始状態の時のみ有効）
-    if st.session_state.start_flg:
-        if st.button("一時中断", use_container_width=True, type="secondary"):
-            # 中断処理: 状態をリセット
-            st.session_state.start_flg = False
-            st.session_state.shadowing_flg = False
-            st.session_state.dictation_flg = False
-            st.session_state.chat_open_flg = False
-            st.info("✋ 一時中断しました。「開始」ボタンで再開できます。")
-            st.rerun()
-    else:
-        st.button("一時中断", use_container_width=True, type="secondary", disabled=True)
-
-st.divider()
 
 # 再生待ちの音声ファイルがあれば再生
 if st.session_state.audio_file_to_play:
@@ -221,6 +187,11 @@ st.session_state.dictation_chat_message = st.chat_input("※「ディクテー�
 
 if st.session_state.dictation_chat_message and not st.session_state.chat_open_flg:
     st.stop()
+
+st.divider()
+
+# 開始ボタン（一番下に配置）
+st.session_state.start_flg = st.button("開始", use_container_width=True, type="primary")
 
 # 「英会話開始」ボタンが押された場合の処理
 if st.session_state.start_flg:
