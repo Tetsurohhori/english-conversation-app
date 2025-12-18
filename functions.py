@@ -3,7 +3,7 @@ import os
 import time
 from pathlib import Path
 from pydub import AudioSegment
-from audiorecorder import audiorecorder
+from audio_recorder_streamlit import audio_recorder
 from langchain.prompts import (
     ChatPromptTemplate,
     HumanMessagePromptTemplate,
@@ -22,20 +22,14 @@ def record_audio(audio_input_file_path):
     5秒間沈黙すると自動的に録音が完了します
     """
 
-    audio = audiorecorder(
-        start_prompt="発話開始",
-        pause_prompt="やり直す",
-        stop_prompt="発話終了",
-        start_style={"color":"white", "background-color":"black"},
-        pause_style={"color":"gray", "background-color":"white"},
-        stop_style={"color":"white", "background-color":"black"},
-        show_visualizer=True,
-        # 5秒間の沈黙で自動停止
+    audio_bytes = audio_recorder(
         key=f"audio_{audio_input_file_path}"
     )
 
-    if len(audio) > 0:
-        audio.export(audio_input_file_path, format="wav")
+    if audio_bytes:
+        # 音声データをファイルに保存
+        with open(audio_input_file_path, 'wb') as audio_file:
+            audio_file.write(audio_bytes)
     else:
         st.stop()
 
