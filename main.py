@@ -76,10 +76,14 @@ with col2:
             st.session_state.shadowing_flg = False
         # 「シャドーイング」選択時の初期化処理
         st.session_state.shadowing_count = 0
+        st.session_state.shadowing_first_flg = True
+        st.session_state.shadowing_evaluation_first_flg = True
         if st.session_state.mode == ct.MODE_2:
             st.session_state.dictation_flg = False
         # 「ディクテーション」選択時の初期化処理
         st.session_state.dictation_count = 0
+        st.session_state.dictation_first_flg = True
+        st.session_state.dictation_evaluation_first_flg = True
         if st.session_state.mode == ct.MODE_3:
             st.session_state.shadowing_flg = False
         # チャット入力欄を非表示にする
