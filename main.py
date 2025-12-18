@@ -93,16 +93,14 @@ if st.session_state.mode in [ct.MODE_2, ct.MODE_3]:
     col5, col6 = st.columns(2)
     with col5:
         st.session_state.topic = st.selectbox(
-            label="トピック",
+            label="テーマ",
             options=list(ct.TOPIC_OPTIONS.keys()),
-            label_visibility="collapsed",
             key="topic_select"
         )
     with col6:
         st.session_state.situation = st.selectbox(
-            label="シチュエーション",
+            label="場面",
             options=list(ct.SITUATION_OPTIONS.keys()),
-            label_visibility="collapsed",
             key="situation_select"
         )
 
