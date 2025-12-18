@@ -2,12 +2,8 @@ import streamlit as st
 import os
 import time
 from pathlib import Path
-import wave
-import pyaudio
 from pydub import AudioSegment
 from audiorecorder import audiorecorder
-import numpy as np
-from scipy.io.wavfile import write
 from langchain.prompts import (
     ChatPromptTemplate,
     HumanMessagePromptTemplate,
@@ -98,48 +94,37 @@ def save_to_wav(llm_response_audio, audio_output_file_path):
 
 def play_wav(audio_output_file_path, speed=1.0):
     """
-    音声ファイルの読み上げ
+    音声ファイルの読み上げ（Streamlitのst.audioを使用）
     Args:
         audio_output_file_path: 音声ファイルのパス
         speed: 再生速度（1.0が通常速度、0.5で半分の速さ、2.0で倍速など）
     """
-
-    # 音声ファイルの読み込み
-    audio = AudioSegment.from_wav(audio_output_file_path)
-    
-    # 速度を変更
-    if speed != 1.0:
-        # frame_rateを変更することで速度を調整
-        modified_audio = audio._spawn(
-            audio.raw_data, 
-            overrides={"frame_rate": int(audio.frame_rate * speed)}
-        )
-        # 元のframe_rateに戻すことで正常再生させる（ピッチを保持したまま速度だけ変更）
-        modified_audio = modified_audio.set_frame_rate(audio.frame_rate)
-
-        modified_audio.export(audio_output_file_path, format="wav")
-
-    # PyAudioで再生
-    with wave.open(audio_output_file_path, 'rb') as play_target_file:
-        p = pyaudio.PyAudio()
-        stream = p.open(
-            format=p.get_format_from_width(play_target_file.getsampwidth()),
-            channels=play_target_file.getnchannels(),
-            rate=play_target_file.getframerate(),
-            output=True
-        )
-
-        data = play_target_file.readframes(1024)
-        while data:
-            stream.write(data)
-            data = play_target_file.readframes(1024)
-
-        stream.stop_stream()
-        stream.close()
-        p.terminate()
-    
-    # LLMからの回答の音声ファイルを削除
-    os.remove(audio_output_file_path)
+    try:
+        # 音声ファイルの読み込み
+        audio = AudioSegment.from_wav(audio_output_file_path)
+        
+        # 速度を変更
+        if speed != 1.0:
+            # frame_rateを変更することで速度を調整
+            modified_audio = audio._spawn(
+                audio.raw_data, 
+                overrides={"frame_rate": int(audio.frame_rate * speed)}
+            )
+            # 元のframe_rateに戻すことで正常再生させる（ピッチを保持したまま速度だけ変更）
+            modified_audio = modified_audio.set_frame_rate(audio.frame_rate)
+            modified_audio.export(audio_output_file_path, format="wav")
+        
+        # Streamlitのaudio機能で再生（自動再生）
+        with open(audio_output_file_path, 'rb') as audio_file:
+            audio_bytes = audio_file.read()
+            st.audio(audio_bytes, format='audio/wav', autoplay=True)
+        
+    except Exception as e:
+        st.error(f"⚠️ 音声再生中にエラーが発生しました: {str(e)}")
+    finally:
+        # LLMからの回答の音声ファイルを削除
+        if os.path.exists(audio_output_file_path):
+            os.remove(audio_output_file_path)
 
 def create_chain(system_template):
     """
