@@ -3,7 +3,6 @@ import os
 import time
 from pathlib import Path
 from pydub import AudioSegment
-from audio_recorder_streamlit import audio_recorder
 from langchain.prompts import (
     ChatPromptTemplate,
     HumanMessagePromptTemplate,
@@ -19,89 +18,59 @@ from openai import OpenAIError, APIError, APIConnectionError, RateLimitError
 def record_audio(audio_input_file_path):
     """
     音声入力を受け取って音声ファイルを作成
-    ユーザーが録音ボタンを押して録音を開始・停止します
+    Streamlitの標準audio_inputウィジェットを使用
     """
     
-    # 録音カウンターを初期化（session_stateで管理）
-    if 'audio_recording_counter' not in st.session_state:
-        st.session_state.audio_recording_counter = 0
+    st.info("🎤 下の録音ボタンをクリックして話してください")
     
-    # 前回の録音データをクリア
-    if 'previous_audio_bytes' not in st.session_state:
-        st.session_state.previous_audio_bytes = None
+    # Streamlitの標準音声入力ウィジェット
+    audio_bytes = st.audio_input("音声を録音", key=f"audio_input_{int(time.time())}")
     
-    st.info("🎤 マイクボタンをクリックして録音を開始し、話し終わったらもう一度クリックして停止してください")
-    st.warning("⚠️ 最低でも1秒以上話してください（短すぎるとエラーになります）")
-    
-    # 録音カウンターをkeyに使用
-    audio_bytes = audio_recorder(
-        text="",
-        recording_color="#e74c3c",
-        neutral_color="#3498db",
-        icon_name="microphone",
-        icon_size="3x",
-        key=f"audio_recorder_{st.session_state.audio_recording_counter}"
-    )
-
-    # 新しい録音データがある場合（前回と異なる場合）
-    if audio_bytes and audio_bytes != st.session_state.previous_audio_bytes:
-        # 前回のデータを更新
-        st.session_state.previous_audio_bytes = audio_bytes
-        
-        # 音声データの長さをチェック
-        audio_length = len(audio_bytes)
-        
-        # 音声が短すぎる場合（バイト数で判定）
-        # wav形式の場合、44バイトのヘッダー + 実データ
-        # 最低でも1秒分のデータが必要（16kHz、16bit、モノラル = 約32KB）
-        min_size = 10000  # 約0.3秒分（安全マージン含む）
-        
-        if audio_length < min_size:
-            st.error("❌ 録音が短すぎます。もう一度録音してください（最低1秒以上話してください）")
-            # カウンターをインクリメントしてリセット
-            st.session_state.audio_recording_counter += 1
-            st.session_state.previous_audio_bytes = None
-            time.sleep(2)  # エラーメッセージを表示する時間を確保
-            st.rerun()
-            return False
-        
+    if audio_bytes:
         # 音声データをファイルに保存
         try:
-            with open(audio_input_file_path, 'wb') as audio_file:
-                audio_file.write(audio_bytes)
+            # audio_bytesはUploadedFileオブジェクト
+            audio_data = audio_bytes.read()
             
-            # 音声ファイルの長さを確認（pydubを使用）
+            # 音声データの長さをチェック
+            audio_length = len(audio_data)
+            
+            # 音声が短すぎる場合（最小サイズチェック）
+            min_size = 10000  # 約0.3秒分
+            
+            if audio_length < min_size:
+                st.error("❌ 録音が短すぎます。もう一度録音してください（最低1秒以上話してください）")
+                st.stop()
+                return False
+            
+            # ファイルに保存
+            with open(audio_input_file_path, 'wb') as audio_file:
+                audio_file.write(audio_data)
+            
+            # 音声ファイルの長さを確認
             from pydub import AudioSegment
             audio = AudioSegment.from_file(audio_input_file_path)
             duration_seconds = len(audio) / 1000.0  # ミリ秒を秒に変換
             
             if duration_seconds < 0.5:
                 st.error(f"❌ 録音が短すぎます（{duration_seconds:.1f}秒）。もう一度録音してください（最低1秒以上）")
-                os.remove(audio_input_file_path)  # 短すぎるファイルを削除
-                st.session_state.audio_recording_counter += 1
-                st.session_state.previous_audio_bytes = None
-                time.sleep(2)
-                st.rerun()
+                os.remove(audio_input_file_path)
+                st.stop()
                 return False
             
             st.success(f"✅ 録音完了！（{duration_seconds:.1f}秒）音声を処理中...")
-            
-            # 次回のために録音カウンターをインクリメント
-            st.session_state.audio_recording_counter += 1
-            st.session_state.previous_audio_bytes = None
             return True
             
         except Exception as e:
             st.error(f"⚠️ 音声ファイルの処理中にエラーが発生しました: {str(e)}")
-            st.session_state.audio_recording_counter += 1
-            st.session_state.previous_audio_bytes = None
-            time.sleep(2)
-            st.rerun()
+            if os.path.exists(audio_input_file_path):
+                os.remove(audio_input_file_path)
+            st.stop()
             return False
-    
-    # 録音が完了していない場合は処理を中断
-    st.stop()
-    return False
+    else:
+        # 録音が完了していない場合は処理を中断
+        st.stop()
+        return False
 
 def transcribe_audio(audio_input_file_path):
     """
