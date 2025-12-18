@@ -196,8 +196,11 @@ if st.session_state.dictation_chat_message and not st.session_state.chat_open_fl
 st.divider()
 
 # 開始ボタン（一番下に配置）
-if st.button("開始", use_container_width=True, type="primary"):
-    st.session_state.start_flg = True
+# 練習開始前のみ表示
+if not st.session_state.start_flg:
+    if st.button("開始", use_container_width=True, type="primary"):
+        st.session_state.start_flg = True
+        st.rerun()
 
 # 「英会話開始」ボタンが押された場合の処理
 if st.session_state.start_flg:
